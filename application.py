@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
@@ -11,25 +11,53 @@ db = scoped_session(sessionmaker(bind=engine))
 
 @app.route("/")
 def index():
-    flights = db.execute("SELECT * FROM flights").fetchall()
-    return render_template("index.html", flights=flights)
+    return render_template("index.html")
 
+@app.route("/res" , methods=["post","get"])
+def res():
+    name=request.form.get("name") 
+    if not name:
+        return render_template("err.html",massage="plase enter the name")
+    pw=request.form.get("password") 
+    if not pw:
+        return render_template("err.html",massage="plase enter the password")
+    if db.execute("select * from members where name like :name", {"name":name}).rowcount==0 :
+        db.execute("insert into members(name,password) values (:name,:password)",{"name":name,"password":pw})
+        db.commit()
+        return render_template("index.html",massage="register successfully,please sign in")
+    else:
+        return render_template("err.html",massage="username has been used")
+     
 @app.route("/book", methods=["POST"])
 def book():
-    """Book a flight."""
 
-    # Get form information.
-    name = request.form.get("name")
-    try:
-        flight_id = int(request.form.get("flight_id"))
-    except ValueError:
-        return render_template("error.html", message="Invalid flight number.")
+    name=request.form.get("name") 
+    if not name:
+        return render_template("err.html",massage="plase enter the name")
+    pw=request.form.get("password") 
+    if not pw:
+        return render_template("err.html",massage="plase enter the password")
+    if db.execute("select * from members where name like :name and password=:password", {"name":name,"password":pw}).rowcount==1 :
+        return redirect('/success')
+    else:
+        return render_template("err.html",massage="invaild name or password")
 
-    # Make sure the flight exists.
-    if db.execute("SELECT * FROM flights WHERE id = :id", {"id": flight_id}).rowcount == 0:
-        return render_template("error.html", message="No such flight with that id.")
-    db.execute("INSERT INTO passengers (name, flight_id) VALUES (:name, :flight_id)",
-            {"name": name, "flight_id": flight_id})
-    db.commit()
-    return render_template("success.html")
+    
+@app.route("/success", methods=["post","get"])
+def success():
+    if request.method=="POST" :
+        
+            name=request.form.get("name")
+            if not name:
+                return render_template("success.html",massage="please enter book")
+            books= db.execute(f"select * from books where title like '%{name}%'").fetchall()
+            
+    else:
+        return render_template("success.html")
+        
+    if not books:
+        return render_template("success.html",massage="can't find any book")
+    else :
+        return render_template("success.html",books=books)
 
+    
